@@ -29,6 +29,7 @@ while(vid_capture.isOpened()):
   # and the second is frame
   ret, frame = vid_capture.read()
   if ret == True: #there is a frame to read
+    #setting the instructions
     instruc = (50,100)
     instruc_end  = (instruc[0] + 1100, instruc[1] - 45)
     cv2.rectangle(frame, (instruc[0], instruc[1] +3), instruc_end, (255,255,255), thickness= -1, lineType=cv2.LINE_8)
@@ -36,18 +37,22 @@ while(vid_capture.isOpened()):
         cv2.putText(frame, "Press s to switch to aspirating", instruc, fontFace = cv2.FONT_HERSHEY_TRIPLEX, fontScale = 2, color = (0,0,0))
     else:
         cv2.putText(frame, "Press s to switch to dispensing", instruc, fontFace = cv2.FONT_HERSHEY_TRIPLEX, fontScale = 2, color = (0,0,0))
+    
+    #using the hsv color space (typically the best for color detection)
     hsv=cv2.cvtColor(frame,cv2.COLOR_BGR2HSV)
-    maskYCB = cv2.inRange(hsv, minHSV, maxHSV)
+    maskHSV = cv2.inRange(hsv, minHSV, maxHSV) #make a mask for all colors in that range
     if(max_center != (0,0)):
+        #make a circle around the previous two points
         mask_spacial = np.zeros(frame.shape[:2], dtype = "uint8")
         mask_spacial = cv2.circle(mask_spacial,max_center, 300,255,-1)
         mask_spacial = cv2.circle(mask_spacial,sec_max_center, 300,255,-1)
-        mask = cv2.bitwise_and(maskYCB,mask_spacial)
-        mask = maskYCB
+        mask = cv2.bitwise_and(maskHSV,mask_spacial)
+        mask = maskHSV
     else:
-        mask = maskYCB
-    contours,_= cv2.findContours(mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+        mask = maskHSV
+    contours,_= cv2.findContours(mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE) #grab contours of mask
     if len(contours) > 1:
+        #get max 2 contours
         max = float('-inf')
         second_last = float('-inf')
 
@@ -63,6 +68,7 @@ while(vid_capture.isOpened()):
                 sec_max_contour = contour
                 second_last = cv2.contourArea(contour)
         
+        #get the center of each contour
         M=cv2.moments(max_contour)
         if(M['m00'] == 0):
             continue
@@ -80,11 +86,14 @@ while(vid_capture.isOpened()):
         sec_max_center = (cx,cy)
         cv2.circle(frame, (cx,cy),3,(0,0,255),-1)
         point_sec = (cx, cy)
+
+        #draw the contours
         cv2.drawContours(frame, max_contour, -1, (0, 255, 0), 2, cv2.LINE_AA)
         cv2.drawContours(frame, sec_max_contour, -1, (0, 255, 0), 2, cv2.LINE_AA)
         cv2.line(frame, point_max, point_sec, (255, 255, 0), thickness=1, lineType=cv2.LINE_AA) 
 
         text = "NA"
+        #get the angles
         if((point_max[0]-point_sec[0]) != 0):
             angle = round(abs(math.atan((point_max[1]-point_sec[1])/(point_max[0]-point_sec[0]))*180/math.pi),2)
             text = str(angle)
@@ -109,7 +118,7 @@ while(vid_capture.isOpened()):
         
         cv2.putText(frame, text, org, fontFace = cv2.FONT_HERSHEY_PLAIN, fontScale = 3, color = (0,0,0))
     cv2.imshow('Frame',frame)
-    # 20 is in milliseconds, try to increase the value, say 50 and observe
+
     key = cv2.waitKey(50)
     if key == ord('s'):
         dispensing = not dispensing
